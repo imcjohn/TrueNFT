@@ -49,6 +49,10 @@ var (
 
 	// ZeroCurrency defines a currency of value zero.
 	ZeroCurrency = NewCurrency64(0)
+
+	// Useful denominations for working base units
+	bigIntOne, _ = new(big.Int).SetString("1000000000000000000000000", 10)
+	OneBaseUnit  = NewCurrency(bigIntOne) // 1 tNFT token in the smallest denomination
 )
 
 // NewCurrency creates a Currency value from a big.Int. Undefined behavior

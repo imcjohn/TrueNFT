@@ -51,6 +51,11 @@ var (
 	// will never be used within the formal Sia protocol.
 	PrefixNonSia = types.NewSpecifier("NonSia")
 
+	// PrefixNFTCustody means that this transaction is specially marked
+	// as an NFT chain-of-custody transfer, and thus uses the arbitrary
+	// data field
+	PrefixNFTCustody = types.NewSpecifier("NFT")
+
 	// TransactionPoolDir is the name of the directory that is used to store
 	// the transaction pool's persistent data.
 	TransactionPoolDir = "transactionpool"

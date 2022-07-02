@@ -504,6 +504,9 @@ type (
 		// also returned to the caller.
 		SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
 
+		// Mint an NFT corresponding to specific data to an address
+		MintNFT(nft types.NftCustody, dest types.UnlockHash) ([]types.Transaction, error)
+
 		// SendSiacoinsFeeIncluded sends siacoins with fees included.
 		SendSiacoinsFeeIncluded(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
 
