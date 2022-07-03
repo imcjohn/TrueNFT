@@ -585,7 +585,6 @@ func walletSeedsHandler(wallet modules.Wallet, w http.ResponseWriter, req *http.
 // walletMintNFTHandler handles API calls to /wallet/nft/mint
 // only argument is merkleRoot for merkle root of the data
 func walletMintNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-	fmt.Println(crypto.HashBytes([]byte{1, 2, 3, 4}).String())
 	// load params
 	var merkleRoot crypto.Hash
 	var nft types.NftCustody
@@ -597,6 +596,7 @@ func walletMintNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *htt
 	nft.MerkleRoot = merkleRoot
 	// make minting transaction(s)
 	unlockConditions, _ := wallet.NextAddress()
+	fmt.Println(unlockConditions)
 	var txns []types.Transaction
 	var output types.UnlockHash = unlockConditions.UnlockHash()
 	txns, err = wallet.MintNFT(nft, output)

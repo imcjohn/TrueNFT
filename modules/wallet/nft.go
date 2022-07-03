@@ -1,8 +1,6 @@
 package wallet
 
 import (
-	"math/big"
-
 	"gitlab.com/NebulousLabs/errors"
 	"go.sia.tech/siad/build"
 	"go.sia.tech/siad/modules"
@@ -17,28 +15,13 @@ import (
 // in NFT transactions
 const estimatedNFTTransactionSize = estimatedTransactionSize * 2.0
 
-// Constants
-func CurrencyFromConst(amount string) types.Currency {
-	hastings, _ := types.ParseCurrency(amount)
-	i, _ := new(big.Int).SetString(hastings, 10)
-	c := types.NewCurrency(i)
-	return c
-}
-
-// Network-specific costs
-var (
-	NFTMintCost     = CurrencyFromConst("5000SC")
-	NFTLockupAmount = CurrencyFromConst("2500SC")
-	NFTHostAmount   = CurrencyFromConst("2500SC")
-	NFTTransferCost = CurrencyFromConst("500SC")
-)
-
 // Random valid address to use for NFT Lockup
 // TODO: Switch to anyone-can-spend outputs
-var NFTLockupAddress = types.MustParseAddress("4b339bd24e1e9f9688e259a703e523f26c3093f0b720ab247b1f5a82bf17a0cffef96354768b")
-var NFTStoragePoolAddress = types.MustParseAddress("db5867e4a59232e5025fb01d960342128e496e3ae3e2c5c56a547f36000cee15bc54af9ee049")
 
 func (w *Wallet) MintNFT(nft types.NftCustody, dest types.UnlockHash) (txns []types.Transaction, err error) {
+	// Load lockup condition structs
+	NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := types.NFTPoolUnlockConditions()
+
 	// Check if consensus is synced
 	if !w.cs.Synced() || w.deps.Disrupt("UnsyncedConsensus") {
 		return nil, errors.New("cannot send siacoin until fully synced")
@@ -54,12 +37,12 @@ func (w *Wallet) MintNFT(nft types.NftCustody, dest types.UnlockHash) (txns []ty
 
 	// Create outputs for lockup pool, host pool, and colored-coin custody
 	lockupOutput := types.SiacoinOutput{
-		UnlockHash: NFTLockupAddress,
-		Value:      NFTLockupAmount,
+		UnlockHash: NFTLockupUnlockConditions.UnlockHash(),
+		Value:      types.NFTLockupAmount,
 	}
 	storagePoolOutput := types.SiacoinOutput{
-		UnlockHash: NFTStoragePoolAddress,
-		Value:      NFTLockupAmount,
+		UnlockHash: NFTStoragePoolUnlockConditions.UnlockHash(),
+		Value:      types.NFTLockupAmount,
 	}
 	NFTMintingOutput := types.SiacoinOutput{
 		UnlockHash: dest,
@@ -69,7 +52,7 @@ func (w *Wallet) MintNFT(nft types.NftCustody, dest types.UnlockHash) (txns []ty
 	// Assemble transaction and fund
 	_, fee := w.tpool.FeeEstimation()
 	fee = fee.Mul64(estimatedNFTTransactionSize)
-	totalCost := NFTHostAmount.Add(NFTLockupAmount).Add(types.OneBaseUnit).Add(fee)
+	totalCost := types.NFTHostAmount.Add(types.NFTLockupAmount).Add(types.OneBaseUnit).Add(fee)
 	txnBuilder, err := w.StartTransaction()
 	if err != nil {
 		return nil, err

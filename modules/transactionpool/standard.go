@@ -2,7 +2,6 @@ package transactionpool
 
 import (
 	"errors"
-	"fmt"
 
 	"gitlab.com/NebulousLabs/encoding"
 	"go.sia.tech/siad/modules"
@@ -105,8 +104,6 @@ func isStandardTransaction(t types.Transaction) (uint64, error) {
 	for _, arb := range t.ArbitraryData {
 		// Check for a whilelisted prefix.
 		copy(prefix[:], arb)
-		fmt.Println(prefix[:])
-		fmt.Println(arb)
 		if prefix == modules.PrefixHostAnnouncement ||
 			prefix == modules.PrefixNonSia ||
 			prefix == modules.PrefixFileContractIdentifier ||
