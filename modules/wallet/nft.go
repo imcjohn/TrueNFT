@@ -70,7 +70,7 @@ func (w *Wallet) MintNFT(nft types.NftCustody, dest types.UnlockHash) (txns []ty
 	txnBuilder.AddMinerFee(fee)
 
 	// Add Arbitrary Data specifier to prove NFT Minting Transaction for validators
-	arbitraryData := modules.PrefixNFTCustody[:]
+	arbitraryData := types.PrefixNFTCustody[:]
 	merkleRoot := []byte(nft.MerkleRoot.String())
 	arbitraryData = append(arbitraryData, types.NFTMintTag...)
 	arbitraryData = append(arbitraryData, merkleRoot...)

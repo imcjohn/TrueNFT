@@ -10,14 +10,48 @@ import (
 /// Contains core NFT types for internal representation of on-chain assets
 /// Author: Ian McJohn
 
-// Types
-
-// Constants
+// Helper Functions
 func CurrencyFromConst(amount string) Currency {
 	hastings, _ := ParseCurrency(amount)
 	i, _ := new(big.Int).SetString(hastings, 10)
 	c := NewCurrency(i)
 	return c
+}
+
+// Useful constants
+var (
+	NFTMintTag = []byte{'M', 'N'}
+	// Network-specific costs
+	NFTMintCost     = CurrencyFromConst("5000SC")
+	NFTLockupAmount = CurrencyFromConst("2500SC")
+	NFTHostAmount   = CurrencyFromConst("2500SC")
+	NFTTransferCost = CurrencyFromConst("500SC")
+	// PrefixNFTCustody means that this transaction is specially marked
+	// as an NFT chain-of-custody transfer, and thus uses the arbitrary
+	// data field
+	PrefixNFTCustody = NewSpecifier("NFT")
+)
+
+// Discerning functions for filtering NFT transactions
+func IsNFTTransaction(t Transaction) bool {
+	// Don't run on non-nft transactions
+	var prefix Specifier
+	if len(t.ArbitraryData) < 1 {
+		return false
+	}
+	nftTag := t.ArbitraryData[0]
+	copy(prefix[:], nftTag)
+	return prefix == PrefixNFTCustody
+}
+
+func IsNFTMintTransaction(t Transaction) bool {
+	if !IsNFTTransaction(t) {
+		return false
+	}
+	idx := SpecifierLen
+	b1 := t.ArbitraryData[0][idx]
+	b2 := t.ArbitraryData[0][idx+1]
+	return b1 == NFTMintTag[0] && b2 == NFTMintTag[1]
 }
 
 // Function to create the unlock conditions for
@@ -46,6 +80,7 @@ func NFTPoolUnlockConditions() (UnlockConditions, UnlockConditions) {
 	return NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions
 }
 
+// Core NFT Types
 type (
 	NftCustody struct {
 		// merkle root corresponding to hash of NFT's data
@@ -53,13 +88,4 @@ type (
 		// ideally set this to a more useful/constrained type in the future
 		MerkleRoot crypto.Hash
 	}
-)
-
-var (
-	NFTMintTag = []byte{'M', 'N'}
-	// Network-specific costs
-	NFTMintCost     = CurrencyFromConst("5000SC")
-	NFTLockupAmount = CurrencyFromConst("2500SC")
-	NFTHostAmount   = CurrencyFromConst("2500SC")
-	NFTTransferCost = CurrencyFromConst("500SC")
 )

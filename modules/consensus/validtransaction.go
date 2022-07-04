@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 
 	"gitlab.com/NebulousLabs/bolt"
@@ -26,7 +27,33 @@ var (
 	errUnrecognizedFileContractID = errors.New("cannot fetch storage proof segment for unknown file contract")
 	errWrongUnlockConditions      = errors.New("transaction contains incorrect unlock conditions")
 	errUnsignedFoundationUpdate   = errors.New("transaction contains an Foundation UnlockHash update with missing or invalid signatures")
+	errIncorrectMintFees          = errors.New("minting fees for NFT were paid incorrectly")
 )
+
+// validNFTCustody checks that for any nft operations (mint, transfer, liquidate)
+// the chain of custody is correct and all appropriate fees are apid
+func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
+	// For any mint transaction, check that fees are being paid to appropriate pools
+	if types.IsNFTMintTransaction(t) {
+		fmt.Println("Validating NFT Mint Transaction", t)
+		NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := types.NFTPoolUnlockConditions()
+		var lockupPaid = false
+		var storagePaid = false
+		for _, op := range t.SiacoinOutputs {
+			if op.UnlockHash == NFTLockupUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTLockupAmount) {
+				lockupPaid = true
+			}
+			if op.UnlockHash == NFTStoragePoolUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTHostAmount) {
+				storagePaid = true
+			}
+		}
+		if !lockupPaid || !storagePaid {
+			return errIncorrectMintFees
+		}
+	}
+
+	return nil
+}
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
@@ -352,6 +379,10 @@ func validTransaction(tx *bolt.Tx, t types.Transaction) error {
 		return err
 	}
 	err = validArbitraryData(tx, t, currentHeight)
+	if err != nil {
+		return err
+	}
+	err = validNFTCustody(tx, t)
 	if err != nil {
 		return err
 	}
