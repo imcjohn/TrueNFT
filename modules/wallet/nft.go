@@ -175,7 +175,7 @@ func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns 
 	// Add Arbitrary Data specifier to prove NFT Minting Transaction for validators
 	arbitraryData := types.PrefixNFTCustody[:]
 	merkleRoot := []byte(nft.MerkleRoot.String())
-	arbitraryData = append(arbitraryData, types.NFTMintTag...)
+	arbitraryData = append(arbitraryData, types.NFTTransferTag...)
 	arbitraryData = append(arbitraryData, merkleRoot...)
 	txnBuilder.AddArbitraryData(arbitraryData)
 
