@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 
 	"gitlab.com/NebulousLabs/bolt"
@@ -35,7 +34,6 @@ var (
 func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
 	// For any mint transaction, check that fees are being paid to appropriate pools
 	if types.IsNFTMintTransaction(t) {
-		fmt.Println("Validating NFT Mint Transaction", t)
 		NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := types.NFTPoolUnlockConditions()
 		var lockupPaid = false
 		var storagePaid = false
