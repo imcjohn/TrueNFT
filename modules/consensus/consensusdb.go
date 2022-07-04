@@ -322,7 +322,6 @@ func UpdateNFTCustody(tx *bolt.Tx, nft types.NftCustody, owner types.UnlockHash)
 	if nftOutputs.Get(id) != nil {
 		nftOutputs.Delete(id)
 	}
-	fmt.Println("NFT", id, "now owned by", owner)
 	nftOutputs.Put(id, custody)
 }
 
@@ -339,7 +338,7 @@ func ViewNFTCustody(tx *bolt.Tx, nft types.NftCustody) types.UnlockHash {
 		if build.DEBUG {
 			fmt.Println("NOTE: NFT DB miss for", nft)
 		}
-		return types.NFTWithoutCustody // not found, return blank hash (same as liquidated)
+		return types.NFTWithoutCustody // not found, return blank hash
 	}
 	encoding.Unmarshal(data, ret)
 	return ret
