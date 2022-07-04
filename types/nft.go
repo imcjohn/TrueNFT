@@ -20,7 +20,11 @@ func CurrencyFromConst(amount string) Currency {
 
 // Useful constants
 var (
-	NFTMintTag = []byte{'M', 'N'}
+	NFTTagLen               = 2
+	NFTMintTag              = []byte{'M', 'N'}
+	NFTTransferTag          = []byte{'T', 'R'}
+	NFTWithoutCustody       = UnlockHash{}
+	LiquidatedNFTUnlockHash = UnlockHash{'L', 'Q'}
 	// Network-specific costs
 	NFTMintCost     = CurrencyFromConst("5000SC")
 	NFTLockupAmount = CurrencyFromConst("2500SC")
@@ -52,6 +56,36 @@ func IsNFTMintTransaction(t Transaction) bool {
 	b1 := t.ArbitraryData[0][idx]
 	b2 := t.ArbitraryData[0][idx+1]
 	return b1 == NFTMintTag[0] && b2 == NFTMintTag[1]
+}
+
+func IsNFTTransferTransaction(t Transaction) bool {
+	if !IsNFTTransaction(t) {
+		return false
+	}
+	idx := SpecifierLen
+	b1 := t.ArbitraryData[0][idx]
+	b2 := t.ArbitraryData[0][idx+1]
+	return b1 == NFTTransferTag[0] && b2 == NFTTransferTag[1]
+}
+
+// Remove NFT Information from arbitrary data
+func ExtractNFTFromData(t Transaction) NftCustody {
+	NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := NFTPoolUnlockConditions()
+	// First extract merkle root
+	startIndex := SpecifierLen + NFTTagLen
+	var ret NftCustody
+	var merkleRoot []byte = t.ArbitraryData[0][startIndex:]
+	ret.MerkleRoot.LoadString(string(merkleRoot))
+	// Then extract current owner
+	// TODO: Modify to return dead value for liquidates
+	for _, out := range t.SiacoinOutputs {
+		h := out.UnlockHash
+		if h != NFTLockupUnlockConditions.UnlockHash() && h != NFTStoragePoolUnlockConditions.UnlockHash() {
+			ret.CurrentOwner = h // Valid NFT Transactions only have one non-payoff output
+			break
+		}
+	}
+	return ret
 }
 
 // Function to create the unlock conditions for
@@ -87,5 +121,7 @@ type (
 		// used as unique identifier for NFT throughout codebase
 		// ideally set this to a more useful/constrained type in the future
 		MerkleRoot crypto.Hash
+		// Current output owning this NFT, if known
+		CurrentOwner UnlockHash
 	}
 )

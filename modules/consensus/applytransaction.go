@@ -213,6 +213,11 @@ func applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 // that are recognized by consensus. Currently, types.FoundationUnlockHashUpdate
 // is the only recognized value.
 func applyArbitraryData(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
+	// NFT-specific arbitrary data
+	if types.IsNFTMintTransaction(t) || types.IsNFTTransferTransaction(t) {
+		nft := types.ExtractNFTFromData(t)
+		UpdateNFTCustody(tx, nft, nft.CurrentOwner)
+	}
 	// No ArbitraryData values were recognized prior to the Foundation hardfork.
 	if pb.Height < types.FoundationHardforkHeight {
 		return

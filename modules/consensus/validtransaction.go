@@ -37,6 +37,7 @@ func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
 		NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := types.NFTPoolUnlockConditions()
 		var lockupPaid = false
 		var storagePaid = false
+		var validOutputCount = (len(t.SiacoinOutputs) == 3) // lockup + storage + colored coin
 		for _, op := range t.SiacoinOutputs {
 			if op.UnlockHash == NFTLockupUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTLockupAmount) {
 				lockupPaid = true
@@ -45,7 +46,7 @@ func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
 				storagePaid = true
 			}
 		}
-		if !lockupPaid || !storagePaid {
+		if !lockupPaid || !storagePaid || !validOutputCount {
 			return errIncorrectMintFees
 		}
 	}

@@ -7,6 +7,8 @@ package consensus
 // ignored otherwise, which is suboptimal.
 
 import (
+	"fmt"
+
 	"gitlab.com/NebulousLabs/bolt"
 
 	"gitlab.com/NebulousLabs/encoding"
@@ -70,6 +72,12 @@ var (
 	// siafund pool.
 	SiafundPool = []byte("SiafundPool")
 
+	// NFTCustodyPool
+	// The NFT Custody Pool maps the merkle root of every seen NFT to the current
+	// custodial output of that NFT, nil if unseen,
+	// and a special key value for liquidated
+	NFTCustodyPool = []byte("NFTCustodyPool")
+
 	// FoundationUnlockHashes is a database bucket storing primary and failsafe
 	// Foundation UnlockHashes. It stores both the current values (keyed by
 	// "FoundationUnlockHashes") and the values at specific blocks (keyed by
@@ -101,6 +109,7 @@ func (cs *ConsensusSet) createConsensusDB(tx *bolt.Tx) error {
 		FileContracts,
 		SiafundOutputs,
 		SiafundPool,
+		NFTCustodyPool,
 	}
 	for _, bucket := range buckets {
 		_, err := tx.CreateBucket(bucket)
@@ -301,6 +310,39 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 		return types.SiacoinOutput{}, err
 	}
 	return sco, nil
+}
+
+// Updates NFT Custody to unlock hash currently belonging to unspent NFT output
+// or to types.LiquidatedNFTUnlockHash for a liquidated NFT
+func UpdateNFTCustody(tx *bolt.Tx, nft types.NftCustody, owner types.UnlockHash) {
+	nftOutputs := tx.Bucket(NFTCustodyPool)
+	var id []byte = nft.MerkleRoot[:]
+	var custody []byte = encoding.Marshal(owner)
+
+	if nftOutputs.Get(id) != nil {
+		nftOutputs.Delete(id)
+	}
+	fmt.Println("NFT", id, "now owned by", owner)
+	nftOutputs.Put(id, custody)
+}
+
+// For a given NFT Custody marker, return the unspent output
+// currently containing ownership of this NFT
+// or empty unlock hash for liquidated/unminted NFTs
+func ViewNFTCustody(tx *bolt.Tx, nft types.NftCustody) types.UnlockHash {
+	nftOutputs := tx.Bucket(NFTCustodyPool)
+	var id []byte = nft.MerkleRoot[:]
+
+	var ret types.UnlockHash
+	var data []byte = nftOutputs.Get(id)
+	if data == nil {
+		if build.DEBUG {
+			fmt.Println("NOTE: NFT DB miss for", nft)
+		}
+		return types.NFTWithoutCustody // not found, return blank hash (same as liquidated)
+	}
+	encoding.Unmarshal(data, ret)
+	return ret
 }
 
 // addSiacoinOutput adds a siacoin output to the database. An error is returned

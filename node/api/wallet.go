@@ -596,7 +596,6 @@ func walletMintNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *htt
 	nft.MerkleRoot = merkleRoot
 	// make minting transaction(s)
 	unlockConditions, _ := wallet.NextAddress()
-	fmt.Println(unlockConditions)
 	var txns []types.Transaction
 	var output types.UnlockHash = unlockConditions.UnlockHash()
 	txns, err = wallet.MintNFT(nft, output)
