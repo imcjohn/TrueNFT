@@ -4,7 +4,6 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 	"go.sia.tech/siad/build"
 	"go.sia.tech/siad/modules"
-	"go.sia.tech/siad/modules/consensus"
 	"go.sia.tech/siad/types"
 )
 
@@ -149,12 +148,12 @@ func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns 
 	txnBuilder.AddMinerFee(fee)
 
 	// Locate NFT output from previous chain-of-custody
-	var goalHash types.UnlockHash = consensus.ViewNFTCustody(w.dbTx, nft)
+	var goalHash types.UnlockHash = w.cs.ViewNFTCustodyExternal(nft)
 	var goal_scoid types.SiacoinOutputID
 	var goal_sco types.SiacoinOutput
 	var found bool = false
 	err = dbForEachSiacoinOutput(w.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		if sco.UnlockHash == goalHash {
+		if sco.UnlockHash == goalHash && sco.Value.Equals(types.OneBaseUnit) {
 			goal_scoid = scoid
 			goal_sco = sco
 			found = true

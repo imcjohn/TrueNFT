@@ -69,11 +69,12 @@ func IsNFTTransferTransaction(t Transaction) bool {
 }
 
 // Remove NFT Information from arbitrary data
-func ExtractNFTFromData(t Transaction) NftCustody {
+func ExtractNFTFromData(t Transaction) (NftCustody, UnlockHash) {
 	NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := NFTPoolUnlockConditions()
 	// First extract merkle root
 	startIndex := SpecifierLen + NFTTagLen
 	var ret NftCustody
+	var owner UnlockHash
 	var merkleRoot []byte = t.ArbitraryData[0][startIndex:]
 	ret.MerkleRoot.LoadString(string(merkleRoot))
 	// Then extract current owner
@@ -81,11 +82,11 @@ func ExtractNFTFromData(t Transaction) NftCustody {
 	for _, out := range t.SiacoinOutputs {
 		h := out.UnlockHash
 		if h != NFTLockupUnlockConditions.UnlockHash() && h != NFTStoragePoolUnlockConditions.UnlockHash() {
-			ret.CurrentOwner = h // Valid NFT Transactions only have one non-payoff output
+			owner = h // Valid NFT Transactions only have one non-payoff output
 			break
 		}
 	}
-	return ret
+	return ret, owner
 }
 
 // Function to create the unlock conditions for
@@ -121,7 +122,5 @@ type (
 		// used as unique identifier for NFT throughout codebase
 		// ideally set this to a more useful/constrained type in the future
 		MerkleRoot crypto.Hash
-		// Current output owning this NFT, if known
-		CurrentOwner UnlockHash
 	}
 )

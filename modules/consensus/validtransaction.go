@@ -27,14 +27,15 @@ var (
 	errWrongUnlockConditions      = errors.New("transaction contains incorrect unlock conditions")
 	errUnsignedFoundationUpdate   = errors.New("transaction contains an Foundation UnlockHash update with missing or invalid signatures")
 	errIncorrectMintFees          = errors.New("minting fees for NFT were paid incorrectly")
+	errIncorrectTransferFees      = errors.New("transfer fees for NFT were paid incorrectly")
 )
 
 // validNFTCustody checks that for any nft operations (mint, transfer, liquidate)
 // the chain of custody is correct and all appropriate fees are apid
 func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
 	// For any mint transaction, check that fees are being paid to appropriate pools
+	NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := types.NFTPoolUnlockConditions()
 	if types.IsNFTMintTransaction(t) {
-		NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := types.NFTPoolUnlockConditions()
 		var lockupPaid = false
 		var storagePaid = false
 		var validOutputCount = (len(t.SiacoinOutputs) == 3) // lockup + storage + colored coin
@@ -49,6 +50,24 @@ func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
 		if !lockupPaid || !storagePaid || !validOutputCount {
 			return errIncorrectMintFees
 		}
+	}
+
+	if types.IsNFTTransferTransaction(t) {
+		// first validate payment to pool (as with mint)
+		var storagePaid = false
+		var validOutputCount = (len(t.SiacoinOutputs) == 2) // storage + colored coin
+		for _, op := range t.SiacoinOutputs {
+			if op.UnlockHash == NFTStoragePoolUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTTransferCost) {
+				// fmt.Println("output", op.UnlockHash, op.Value)
+				storagePaid = true
+			}
+		}
+		if !storagePaid || !validOutputCount {
+			// fmt.Println(storagePaid, validOutputCount, len(t.SiacoinOutputs))
+			return errIncorrectTransferFees
+		}
+		// then check chain-of-custody (one input should correspond to address that previously owned NFT)
+
 	}
 
 	return nil

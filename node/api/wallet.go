@@ -198,6 +198,9 @@ func RegisterRoutesWallet(router *httprouter.Router, wallet modules.Wallet, requ
 	router.POST("/wallet/nft/mint", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		walletMintNFTHandler(wallet, w, req, ps)
 	}, requiredPassword))
+	router.POST("/wallet/nft/transfer", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		walletTransferNFTHandler(wallet, w, req, ps)
+	}, requiredPassword))
 	router.POST("/wallet/siacoins", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		walletSiacoinsHandler(wallet, w, req, ps)
 	}, requiredPassword))
@@ -601,6 +604,42 @@ func walletMintNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *htt
 	txns, err = wallet.MintNFT(nft, output)
 	if err != nil {
 		WriteError(w, Error{"error when calling /wallet/nft/mint: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
+
+	var txids []types.TransactionID
+	for _, txn := range txns {
+		txids = append(txids, txn.ID())
+	}
+	WriteJSON(w, WalletSiacoinsPOST{
+		Transactions:   txns,
+		TransactionIDs: txids,
+	})
+}
+
+// walletMintNFTHandler handles API calls to /wallet/nft/transfer
+// arguments are merkleRoot for merkle root of the data
+// and address to transfer the NFT to
+func walletTransferNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// load params
+	var merkleRoot crypto.Hash
+	var nft types.NftCustody
+	err := merkleRoot.LoadString(req.FormValue("merkleRoot"))
+	if err != nil {
+		WriteError(w, Error{"could not load merkle root of NFT to mint"}, http.StatusInternalServerError)
+		return
+	}
+	dest, err := scanAddress(req.FormValue("destination"))
+	if err != nil {
+		WriteError(w, Error{"could not read address from POST call to /wallet/nft/transfer"}, http.StatusBadRequest)
+		return
+	}
+	nft.MerkleRoot = merkleRoot
+	// make minting transaction(s)
+	var txns []types.Transaction
+	txns, err = wallet.TransferNFT(nft, dest)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/nft/transfer: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 

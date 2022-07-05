@@ -314,25 +314,29 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 
 // Updates NFT Custody to unlock hash currently belonging to unspent NFT output
 // or to types.LiquidatedNFTUnlockHash for a liquidated NFT
-func UpdateNFTCustody(tx *bolt.Tx, nft types.NftCustody, owner types.UnlockHash) {
+func updateNFTCustody(tx *bolt.Tx, nft types.NftCustody, owner types.UnlockHash) {
 	nftOutputs := tx.Bucket(NFTCustodyPool)
 	var id []byte = nft.MerkleRoot[:]
-	var custody []byte = encoding.Marshal(owner)
+	custody, _ := owner.MarshalJSON()
 
-	if nftOutputs.Get(id) != nil {
-		nftOutputs.Delete(id)
+	if build.DEBUG {
+		fmt.Println("NFT Custody updated for", nft, "new owner:", owner, "bytes:", custody)
 	}
-	nftOutputs.Put(id, custody)
+
+	err := nftOutputs.Put(id, custody)
+
+	if err != nil && build.DEBUG {
+		fmt.Println("Error updating custody", err)
+	}
 }
 
 // For a given NFT Custody marker, return the unspent output
 // currently containing ownership of this NFT
 // or empty unlock hash for liquidated/unminted NFTs
-func ViewNFTCustody(tx *bolt.Tx, nft types.NftCustody) types.UnlockHash {
+func viewNFTCustody(tx *bolt.Tx, nft types.NftCustody) types.UnlockHash {
 	nftOutputs := tx.Bucket(NFTCustodyPool)
 	var id []byte = nft.MerkleRoot[:]
 
-	var ret types.UnlockHash
 	var data []byte = nftOutputs.Get(id)
 	if data == nil {
 		if build.DEBUG {
@@ -340,7 +344,20 @@ func ViewNFTCustody(tx *bolt.Tx, nft types.NftCustody) types.UnlockHash {
 		}
 		return types.NFTWithoutCustody // not found, return blank hash
 	}
-	encoding.Unmarshal(data, ret)
+	var ret types.UnlockHash
+	ret.UnmarshalJSON(data)
+	if build.DEBUG {
+		fmt.Println("Located nft custody for", nft, "owner:", ret, "owner bytes:", data)
+	}
+	return ret
+}
+
+func (cs *ConsensusSet) ViewNFTCustodyExternal(nft types.NftCustody) types.UnlockHash {
+	var ret types.UnlockHash
+	cs.db.Update(func(tx *bolt.Tx) error {
+		ret = viewNFTCustody(tx, nft)
+		return nil
+	})
 	return ret
 }
 
