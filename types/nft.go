@@ -23,7 +23,7 @@ var (
 	NFTTagLen               = 2
 	NFTMintTag              = []byte{'M', 'N'}
 	NFTTransferTag          = []byte{'T', 'R'}
-	NFTWithoutCustody       = UnlockHash{}
+	NFTWithoutCustody       = SiacoinOutput{}
 	LiquidatedNFTUnlockHash = UnlockHash{'L', 'Q'}
 	// Network-specific costs
 	NFTMintCost     = CurrencyFromConst("5000SC")
@@ -68,13 +68,13 @@ func IsNFTTransferTransaction(t Transaction) bool {
 	return b1 == NFTTransferTag[0] && b2 == NFTTransferTag[1]
 }
 
-// Remove NFT Information from arbitrary data
-func ExtractNFTFromData(t Transaction) (NftCustody, UnlockHash) {
+// Remove NFT Information from arbitrary data section of transaction
+func ExtractNFTFromTransaction(t Transaction) (NftCustody, SiacoinOutput) {
 	NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := NFTPoolUnlockConditions()
 	// First extract merkle root
 	startIndex := SpecifierLen + NFTTagLen
 	var ret NftCustody
-	var owner UnlockHash
+	var owner SiacoinOutput
 	var merkleRoot []byte = t.ArbitraryData[0][startIndex:]
 	ret.MerkleRoot.LoadString(string(merkleRoot))
 	// Then extract current owner
@@ -82,7 +82,7 @@ func ExtractNFTFromData(t Transaction) (NftCustody, UnlockHash) {
 	for _, out := range t.SiacoinOutputs {
 		h := out.UnlockHash
 		if h != NFTLockupUnlockConditions.UnlockHash() && h != NFTStoragePoolUnlockConditions.UnlockHash() {
-			owner = h // Valid NFT Transactions only have one non-payoff output
+			owner = out // Valid NFT Transactions only have one non-payoff output
 			break
 		}
 	}

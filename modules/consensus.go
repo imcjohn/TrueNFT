@@ -263,7 +263,11 @@ type (
 
 		// View custody of an NFT on (our view of) current network consensus
 		// Abstraction for custody representation
-		ViewNFTCustodyExternal(nft types.NftCustody) types.UnlockHash
+		ViewNFTCustodyExternal(nft types.NftCustody) types.SiacoinOutput
+
+		// Find all NFTs currently in custody for a specific address on
+		// the blockchain
+		FindNFTsForAddressExternal(address types.UnlockHash) []types.NftCustody
 	}
 )
 

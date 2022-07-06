@@ -148,12 +148,15 @@ func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns 
 	txnBuilder.AddMinerFee(fee)
 
 	// Locate NFT output from previous chain-of-custody
-	var goalHash types.UnlockHash = w.cs.ViewNFTCustodyExternal(nft)
+	var goalOutput types.SiacoinOutput = w.cs.ViewNFTCustodyExternal(nft)
 	var goal_scoid types.SiacoinOutputID
 	var goal_sco types.SiacoinOutput
 	var found bool = false
 	err = dbForEachSiacoinOutput(w.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		if sco.UnlockHash == goalHash && sco.Value.Equals(types.OneBaseUnit) {
+		if sco.Value.Equals(goalOutput.Value) && sco.UnlockHash == goalOutput.UnlockHash {
+			// Not guaranteed to be the same output that was used to transfer the NFT to this address
+			// but as far as I know that shouldn't cause any problems? Haven't yet found a use-case
+			// where it needs to be the same one. If it does we can start recording output ids in applytransaction
 			goal_scoid = scoid
 			goal_sco = sco
 			found = true

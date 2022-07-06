@@ -215,7 +215,7 @@ func applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 func applyArbitraryData(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	// NFT-specific arbitrary data
 	if types.IsNFTMintTransaction(t) || types.IsNFTTransferTransaction(t) {
-		nft, owner := types.ExtractNFTFromData(t)
+		nft, owner := types.ExtractNFTFromTransaction(t)
 		updateNFTCustody(tx, nft, owner)
 	}
 	// No ArbitraryData values were recognized prior to the Foundation hardfork.
