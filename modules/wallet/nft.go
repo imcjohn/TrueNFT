@@ -203,3 +203,17 @@ func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns 
 	}
 	return txnSet, nil
 }
+
+// Return all NFTs owned by this wallet as ownership stats
+func (w *Wallet) ScanAllNFTS() []types.NftOwnershipStats {
+	var ret []types.NftOwnershipStats
+	for key := range w.keys {
+		for _, nft := range w.cs.FindNFTsForAddressExternal(key) {
+			var custody types.NftOwnershipStats
+			custody.Nft = nft
+			custody.Owner = key
+			ret = append(ret, custody)
+		}
+	}
+	return ret
+}

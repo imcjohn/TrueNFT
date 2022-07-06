@@ -123,4 +123,8 @@ type (
 		// ideally set this to a more useful/constrained type in the future
 		MerkleRoot crypto.Hash
 	}
+	NftOwnershipStats struct {
+		Nft   NftCustody `json:"nftroots"`
+		Owner UnlockHash `json:"nftowner"`
+	}
 )

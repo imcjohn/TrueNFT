@@ -316,7 +316,7 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 // or to types.LiquidatedNFTUnlockHash for a liquidated NFT
 func updateNFTCustody(tx *bolt.Tx, nft types.NftCustody, owner types.SiacoinOutput) {
 	nftOutputs := tx.Bucket(NFTCustodyPool)
-	var id []byte = nft.MerkleRoot[:]
+	id, _ := nft.MerkleRoot.MarshalJSON()
 	var custody []byte = encoding.Marshal(owner)
 
 	if build.DEBUG {
@@ -335,7 +335,7 @@ func updateNFTCustody(tx *bolt.Tx, nft types.NftCustody, owner types.SiacoinOutp
 // or empty unlock hash for liquidated/unminted NFTs
 func viewNFTCustody(tx *bolt.Tx, nft types.NftCustody) types.SiacoinOutput {
 	nftOutputs := tx.Bucket(NFTCustodyPool)
-	var id []byte = nft.MerkleRoot[:]
+	id, _ := nft.MerkleRoot.MarshalJSON()
 
 	var data []byte = nftOutputs.Get(id)
 	if data == nil {
@@ -373,7 +373,8 @@ func (cs *ConsensusSet) FindNFTsForAddressExternal(address types.UnlockHash) []t
 			encoding.Unmarshal(data, &sco)
 			if sco.UnlockHash == address {
 				var found types.NftCustody
-				found.MerkleRoot.LoadString(string(k))
+				fmt.Println("found custody", k, string(k))
+				found.MerkleRoot.UnmarshalJSON(k)
 				ret = append(ret, found)
 			}
 			return nil

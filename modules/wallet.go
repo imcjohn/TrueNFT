@@ -515,6 +515,9 @@ type (
 		// Transfer an NFT corresponding to specific data to an address
 		TransferNFT(nft types.NftCustody, dest types.UnlockHash) ([]types.Transaction, error)
 
+		// List all NFTs in the custody of this wallet
+		ScanAllNFTS() []types.NftOwnershipStats
+
 		// SendSiacoinsFeeIncluded sends siacoins with fees included.
 		SendSiacoinsFeeIncluded(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
 

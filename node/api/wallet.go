@@ -198,6 +198,9 @@ func RegisterRoutesWallet(router *httprouter.Router, wallet modules.Wallet, requ
 	router.POST("/wallet/nft/mint", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		walletMintNFTHandler(wallet, w, req, ps)
 	}, requiredPassword))
+	router.GET("/wallet/nft/scan", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		walletScanNFTHandler(wallet, w, req, ps)
+	}, requiredPassword)) // not sure if this should require password
 	router.POST("/wallet/nft/transfer", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		walletTransferNFTHandler(wallet, w, req, ps)
 	}, requiredPassword))
@@ -615,6 +618,13 @@ func walletMintNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *htt
 		Transactions:   txns,
 		TransactionIDs: txids,
 	})
+}
+
+// Return json representation of all NFTs in the custody of this wallet
+// Api hook of /wallet/nft/scan
+func walletScanNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var custody []types.NftOwnershipStats = wallet.ScanAllNFTS()
+	WriteJSON(w, custody)
 }
 
 // walletMintNFTHandler handles API calls to /wallet/nft/transfer
