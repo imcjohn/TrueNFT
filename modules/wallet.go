@@ -171,6 +171,11 @@ type (
 		// gets called, this input will be left unsigned.
 		AddSiacoinInput(types.SiacoinInput) uint64
 
+		// AddSiacoinInput adds a siacoin input to the transaction, returning
+		// the index of the siacoin input within the transaction. When 'Sign'
+		// gets called, this input will be signed.
+		AddAndSignSiacoinInput(types.SiacoinInput) uint64
+
 		// AddSiacoinOutput adds a siacoin output to the transaction, returning
 		// the index of the siacoin output within the transaction.
 		AddSiacoinOutput(types.SiacoinOutput) uint64

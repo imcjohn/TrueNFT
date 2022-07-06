@@ -130,7 +130,7 @@ func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns 
 	// Assemble transaction and fund
 	_, fee := w.tpool.FeeEstimation()
 	fee = fee.Mul64(estimatedNFTTransactionSize)
-	totalCost := types.NFTHostAmount.Add(types.NFTTransferCost).Add(fee)
+	totalCost := types.NFTTransferCost.Add(fee)
 	txnBuilder, err := w.StartTransaction()
 	if err != nil {
 		return nil, err
@@ -169,7 +169,7 @@ func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns 
 		ParentID:         goal_scoid,
 		UnlockConditions: w.keys[goal_sco.UnlockHash].UnlockConditions,
 	}
-	txnBuilder.AddSiacoinInput(sci)
+	txnBuilder.AddAndSignSiacoinInput(sci)
 
 	// Add Arbitrary Data specifier to prove NFT Minting Transaction for validators
 	arbitraryData := types.PrefixNFTCustody[:]

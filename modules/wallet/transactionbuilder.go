@@ -553,6 +553,16 @@ func (tb *transactionBuilder) AddSiacoinInput(input types.SiacoinInput) uint64 {
 	return uint64(len(tb.transaction.SiacoinInputs) - 1)
 }
 
+// AddSiacoinInput adds a siacoin input to the transaction, returning the index
+// of the siacoin input within the transaction. When 'Sign' gets called, this
+// input will be signed
+func (tb *transactionBuilder) AddAndSignSiacoinInput(input types.SiacoinInput) uint64 {
+	tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, input)
+	index := int(len(tb.transaction.SiacoinInputs) - 1)
+	tb.siacoinInputs = append(tb.siacoinInputs, index)
+	return uint64(index)
+}
+
 // AddSiacoinOutput adds a siacoin output to the transaction, returning the
 // index of the siacoin output within the transaction.
 func (tb *transactionBuilder) AddSiacoinOutput(output types.SiacoinOutput) uint64 {
