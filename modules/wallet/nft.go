@@ -18,9 +18,31 @@ const estimatedNFTTransactionSize = estimatedTransactionSize * 2.0
 // Random valid address to use for NFT Lockup
 // TODO: Switch to anyone-can-spend outputs
 
-func (w *Wallet) MintNFT(nft types.NftCustody, dest types.UnlockHash) (txns []types.Transaction, err error) {
-	// Load lockup condition structs
-	NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := types.NFTPoolUnlockConditions()
+func signAndSend(w *Wallet, txnBuilder *(modules.TransactionBuilder)) (txns []types.Transaction, err error) {
+	txnSet, err := (*txnBuilder).Sign(true)
+	if err != nil {
+		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
+		return nil, build.ExtendErr("unable to sign transaction", err)
+	}
+	if w.deps.Disrupt("SendSiacoinsInterrupted") {
+		return nil, errors.New("failed to accept transaction set (SendSiacoinsInterrupted)")
+	}
+	err = w.tpool.AcceptTransactionSet(txnSet)
+	if err != nil {
+		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
+		return nil, build.ExtendErr("unable to get transaction accepted", err)
+	}
+	for _, txn := range txnSet {
+		w.log.Println("\t", txn.ID())
+	}
+	return txnSet, nil
+}
+
+func preNFTWalletSetup(w *Wallet) (txns []types.Transaction, err error) {
+	if err := w.tg.Add(); err != nil {
+		return nil, err
+	}
+	defer w.tg.Done()
 
 	// Check if consensus is synced
 	if !w.cs.Synced() || w.deps.Disrupt("UnsyncedConsensus") {
@@ -35,13 +57,23 @@ func (w *Wallet) MintNFT(nft types.NftCustody, dest types.UnlockHash) (txns []ty
 		return nil, modules.ErrLockedWallet
 	}
 
+	return nil, nil
+}
+
+func (w *Wallet) MintNFT(nft types.NftCustody, dest types.UnlockHash) (txns []types.Transaction, err error) {
+	// Add to threadgroup, check locks
+	_, err = preNFTWalletSetup(w)
+	if err != nil {
+		return nil, err // setup failed, pass the error on
+	}
+
 	// Create outputs for lockup pool, host pool, and colored-coin custody
 	lockupOutput := types.SiacoinOutput{
-		UnlockHash: NFTLockupUnlockConditions.UnlockHash(),
+		UnlockHash: types.NFTLockupUnlockConditions.UnlockHash(),
 		Value:      types.NFTLockupAmount,
 	}
 	storagePoolOutput := types.SiacoinOutput{
-		UnlockHash: NFTStoragePoolUnlockConditions.UnlockHash(),
+		UnlockHash: types.NFTStoragePoolUnlockConditions.UnlockHash(),
 		Value:      types.NFTLockupAmount,
 	}
 	NFTMintingOutput := types.SiacoinOutput{
@@ -71,7 +103,7 @@ func (w *Wallet) MintNFT(nft types.NftCustody, dest types.UnlockHash) (txns []ty
 
 	// Add Arbitrary Data specifier to prove NFT Minting Transaction for validators
 	arbitraryData := types.PrefixNFTCustody[:]
-	merkleRoot := []byte(nft.MerkleRoot.String())
+	merkleRoot := []byte(nft.FileMerkleRoot.String())
 	arbitraryData = append(arbitraryData, types.NFTMintTag...)
 	arbitraryData = append(arbitraryData, merkleRoot...)
 	txnBuilder.AddArbitraryData(arbitraryData)
@@ -80,46 +112,21 @@ func (w *Wallet) MintNFT(nft types.NftCustody, dest types.UnlockHash) (txns []ty
 	txnBuilder.AddSiacoinOutput(lockupOutput)
 	txnBuilder.AddSiacoinOutput(storagePoolOutput)
 	txnBuilder.AddSiacoinOutput(NFTMintingOutput)
-	txnSet, err := txnBuilder.Sign(true)
-	if err != nil {
-		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
-		return nil, build.ExtendErr("unable to sign transaction", err)
-	}
-	if w.deps.Disrupt("SendSiacoinsInterrupted") {
-		return nil, errors.New("failed to accept transaction set (SendSiacoinsInterrupted)")
-	}
-	err = w.tpool.AcceptTransactionSet(txnSet)
-	if err != nil {
-		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
-		return nil, build.ExtendErr("unable to get transaction accepted", err)
-	}
-	w.log.Println("Submitted an NFT Minting transaction for nft", nft.MerkleRoot, "with fees", fee.HumanString(), "IDs:")
-	for _, txn := range txnSet {
-		w.log.Println("\t", txn.ID())
-	}
-	return txnSet, nil
+
+	w.log.Println("Submitting an NFT Minting transaction for nft", nft.FileMerkleRoot, "with fees", fee.HumanString())
+	return signAndSend(w, &txnBuilder)
 }
 
 func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns []types.Transaction, err error) {
-	// Load lockup condition structs
-	_, NFTStoragePoolUnlockConditions := types.NFTPoolUnlockConditions()
-
-	// Check if consensus is synced
-	if !w.cs.Synced() || w.deps.Disrupt("UnsyncedConsensus") {
-		return nil, errors.New("cannot send siacoin until fully synced")
-	}
-
-	w.mu.RLock()
-	unlocked := w.unlocked
-	w.mu.RUnlock()
-	if !unlocked {
-		w.log.Println("Attempt to send coins has failed - wallet is locked")
-		return nil, modules.ErrLockedWallet
+	// Add to threadgroup, check locks
+	_, err = preNFTWalletSetup(w)
+	if err != nil {
+		return nil, err // setup failed, pass the error on
 	}
 
 	// Create outputs for transfer fees into host pool, and colored-coin custody
 	storagePoolOutput := types.SiacoinOutput{
-		UnlockHash: NFTStoragePoolUnlockConditions.UnlockHash(),
+		UnlockHash: types.NFTStoragePoolUnlockConditions.UnlockHash(),
 		Value:      types.NFTTransferCost,
 	}
 	NFTTransferOutput := types.SiacoinOutput{
@@ -148,7 +155,11 @@ func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns 
 	txnBuilder.AddMinerFee(fee)
 
 	// Locate NFT output from previous chain-of-custody
-	var goalOutput types.SiacoinOutput = w.cs.ViewNFTCustodyExternal(nft)
+	goalOutput, err := w.cs.ViewNFTCustody(nft)
+	if err != nil {
+		w.log.Println("Attempt to send NFT has failed - Could not locate NFT output for transfer")
+		return nil, build.ExtendErr("unable to locate NFT output for transfer", err)
+	}
 	var goal_scoid types.SiacoinOutputID
 	var goal_sco types.SiacoinOutput
 	var found bool = false
@@ -176,7 +187,7 @@ func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns 
 
 	// Add Arbitrary Data specifier to prove NFT Minting Transaction for validators
 	arbitraryData := types.PrefixNFTCustody[:]
-	merkleRoot := []byte(nft.MerkleRoot.String())
+	merkleRoot := []byte(nft.FileMerkleRoot.String())
 	arbitraryData = append(arbitraryData, types.NFTTransferTag...)
 	arbitraryData = append(arbitraryData, merkleRoot...)
 	txnBuilder.AddArbitraryData(arbitraryData)
@@ -184,28 +195,17 @@ func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns 
 	// Include outputs in transaction and send
 	txnBuilder.AddSiacoinOutput(storagePoolOutput)
 	txnBuilder.AddSiacoinOutput(NFTTransferOutput)
-	txnSet, err := txnBuilder.Sign(true)
-	if err != nil {
-		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
-		return nil, build.ExtendErr("unable to sign transaction", err)
-	}
-	if w.deps.Disrupt("SendSiacoinsInterrupted") {
-		return nil, errors.New("failed to accept transaction set (SendSiacoinsInterrupted)")
-	}
-	err = w.tpool.AcceptTransactionSet(txnSet)
-	if err != nil {
-		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
-		return nil, build.ExtendErr("unable to get transaction accepted", err)
-	}
-	w.log.Println("Submitted an NFT Transfer transaction for nft", nft.MerkleRoot, "with fees", fee.HumanString(), "IDs:")
-	for _, txn := range txnSet {
-		w.log.Println("\t", txn.ID())
-	}
-	return txnSet, nil
+	w.log.Println("Submitting an NFT Transfer transaction for nft", nft.FileMerkleRoot, "with fees", fee.HumanString(), "IDs:")
+	return signAndSend(w, &txnBuilder)
 }
 
 // Return all NFTs owned by this wallet as ownership stats
 func (w *Wallet) ScanAllNFTS() []types.NftOwnershipStats {
+	if err := w.tg.Add(); err != nil {
+		return nil
+	}
+	defer w.tg.Done()
+
 	var ret []types.NftOwnershipStats
 	for key := range w.keys {
 		for _, nft := range w.cs.FindNFTsForAddressExternal(key) {

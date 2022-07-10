@@ -34,16 +34,15 @@ var (
 // the chain of custody is correct and all appropriate fees are apid
 func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
 	// For any mint transaction, check that fees are being paid to appropriate pools
-	NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := types.NFTPoolUnlockConditions()
 	if types.IsNFTMintTransaction(t) {
 		var lockupPaid = false
 		var storagePaid = false
 		var validOutputCount = (len(t.SiacoinOutputs) == 3) // lockup + storage + colored coin
 		for _, op := range t.SiacoinOutputs {
-			if op.UnlockHash == NFTLockupUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTLockupAmount) {
+			if op.UnlockHash == types.NFTLockupUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTLockupAmount) {
 				lockupPaid = true
 			}
-			if op.UnlockHash == NFTStoragePoolUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTHostAmount) {
+			if op.UnlockHash == types.NFTStoragePoolUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTHostAmount) {
 				storagePaid = true
 			}
 		}
@@ -57,7 +56,7 @@ func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
 		var storagePaid = false
 		var validOutputCount = (len(t.SiacoinOutputs) == 2) // storage + colored coin
 		for _, op := range t.SiacoinOutputs {
-			if op.UnlockHash == NFTStoragePoolUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTTransferCost) {
+			if op.UnlockHash == types.NFTStoragePoolUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTTransferCost) {
 				// fmt.Println("output", op.UnlockHash, op.Value)
 				storagePaid = true
 			}

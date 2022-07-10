@@ -316,7 +316,7 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 // or to types.LiquidatedNFTUnlockHash for a liquidated NFT
 func updateNFTCustody(tx *bolt.Tx, nft types.NftCustody, owner types.SiacoinOutput) {
 	nftOutputs := tx.Bucket(NFTCustodyPool)
-	id, _ := nft.MerkleRoot.MarshalJSON()
+	id, _ := nft.FileMerkleRoot.MarshalJSON()
 	var custody []byte = encoding.Marshal(owner)
 
 	if build.DEBUG {
@@ -326,39 +326,39 @@ func updateNFTCustody(tx *bolt.Tx, nft types.NftCustody, owner types.SiacoinOutp
 	err := nftOutputs.Put(id, custody)
 
 	if err != nil && build.DEBUG {
-		fmt.Println("Error updating custody", err)
+		s := fmt.Sprintf("Error updating custody %s", err)
+		panic(s)
 	}
 }
 
 // For a given NFT Custody marker, return the unspent output
 // currently containing ownership of this NFT
 // or empty unlock hash for liquidated/unminted NFTs
-func viewNFTCustody(tx *bolt.Tx, nft types.NftCustody) types.SiacoinOutput {
+func viewNFTCustodyInternal(tx *bolt.Tx, nft types.NftCustody) (types.SiacoinOutput, error) {
 	nftOutputs := tx.Bucket(NFTCustodyPool)
-	id, _ := nft.MerkleRoot.MarshalJSON()
+	id, _ := nft.FileMerkleRoot.MarshalJSON()
 
 	var data []byte = nftOutputs.Get(id)
 	if data == nil {
 		if build.DEBUG {
 			fmt.Println("NOTE: NFT DB miss for", nft)
 		}
-		return types.NFTWithoutCustody // not found, return blank hash
+		return types.NFTWithoutCustody, errNilItem // not found, return blank hash
 	}
 	var ret types.SiacoinOutput
 	encoding.Unmarshal(data, &ret)
 	if build.DEBUG {
 		fmt.Println("Located nft custody for", nft, "owner:", ret, "owner bytes:", data)
 	}
-	return ret
+	return ret, nil
 }
 
-func (cs *ConsensusSet) ViewNFTCustodyExternal(nft types.NftCustody) types.SiacoinOutput {
-	var ret types.SiacoinOutput
+func (cs *ConsensusSet) ViewNFTCustody(nft types.NftCustody) (ret types.SiacoinOutput, err error) {
 	cs.db.View(func(tx *bolt.Tx) error {
-		ret = viewNFTCustody(tx, nft)
+		ret, err = viewNFTCustodyInternal(tx, nft)
 		return nil
 	})
-	return ret
+	return
 }
 
 // Somewhat slow function to return every NFT currently held in custody by an address
@@ -368,13 +368,13 @@ func (cs *ConsensusSet) FindNFTsForAddressExternal(address types.UnlockHash) []t
 	cs.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(NFTCustodyPool)
 
-		b.ForEach(func(k []byte, data []byte) error {
+		_ = b.ForEach(func(k []byte, data []byte) error {
 			var sco types.SiacoinOutput
 			encoding.Unmarshal(data, &sco)
 			if sco.UnlockHash == address {
 				var found types.NftCustody
 				fmt.Println("found custody", k, string(k))
-				found.MerkleRoot.UnmarshalJSON(k)
+				found.FileMerkleRoot.UnmarshalJSON(k)
 				ret = append(ret, found)
 			}
 			return nil

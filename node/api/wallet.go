@@ -599,7 +599,7 @@ func walletMintNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *htt
 		WriteError(w, Error{"could not load merkle root of NFT to mint"}, http.StatusInternalServerError)
 		return
 	}
-	nft.MerkleRoot = merkleRoot
+	nft.FileMerkleRoot = merkleRoot
 	// make minting transaction(s)
 	unlockConditions, _ := wallet.NextAddress()
 	var txns []types.Transaction
@@ -644,7 +644,7 @@ func walletTransferNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req 
 		WriteError(w, Error{"could not read address from POST call to /wallet/nft/transfer"}, http.StatusBadRequest)
 		return
 	}
-	nft.MerkleRoot = merkleRoot
+	nft.FileMerkleRoot = merkleRoot
 	// make minting transaction(s)
 	var txns []types.Transaction
 	txns, err = wallet.TransferNFT(nft, dest)

@@ -20,9 +20,12 @@ func CurrencyFromConst(amount string) Currency {
 
 // Useful constants
 var (
+	NFTMerkleRootLength     = len(crypto.Hash{}.String())
 	NFTTagLen               = 2
 	NFTMintTag              = []byte{'M', 'N'}
+	NFTMintTagLength        = len(NFTMintTag) + NFTMerkleRootLength
 	NFTTransferTag          = []byte{'T', 'R'}
+	NFTTransferTagLength    = len(NFTTransferTag) + NFTMerkleRootLength
 	NFTWithoutCustody       = SiacoinOutput{}
 	LiquidatedNFTUnlockHash = UnlockHash{'L', 'Q'}
 	// Network-specific costs
@@ -49,7 +52,7 @@ func IsNFTTransaction(t Transaction) bool {
 }
 
 func IsNFTMintTransaction(t Transaction) bool {
-	if !IsNFTTransaction(t) {
+	if !IsNFTTransaction(t) || len(t.ArbitraryData[0]) < NFTMintTagLength {
 		return false
 	}
 	idx := SpecifierLen
@@ -59,7 +62,7 @@ func IsNFTMintTransaction(t Transaction) bool {
 }
 
 func IsNFTTransferTransaction(t Transaction) bool {
-	if !IsNFTTransaction(t) {
+	if !IsNFTTransaction(t) || len(t.ArbitraryData[0]) < NFTTransferTagLength {
 		return false
 	}
 	idx := SpecifierLen
@@ -69,14 +72,13 @@ func IsNFTTransferTransaction(t Transaction) bool {
 }
 
 // Remove NFT Information from arbitrary data section of transaction
-func ExtractNFTFromTransaction(t Transaction) (NftCustody, SiacoinOutput) {
-	NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions := NFTPoolUnlockConditions()
+// Precondition on t: must be valid NFT chain-of-custody transaction
+// as determined by above funcs
+func ExtractNFTFromTransaction(t Transaction) (ret NftCustody, owner SiacoinOutput) {
 	// First extract merkle root
 	startIndex := SpecifierLen + NFTTagLen
-	var ret NftCustody
-	var owner SiacoinOutput
 	var merkleRoot []byte = t.ArbitraryData[0][startIndex:]
-	ret.MerkleRoot.LoadString(string(merkleRoot))
+	ret.FileMerkleRoot.LoadString(string(merkleRoot))
 	// Then extract current owner
 	// TODO: Modify to return dead value for liquidates
 	for _, out := range t.SiacoinOutputs {
@@ -115,13 +117,17 @@ func NFTPoolUnlockConditions() (UnlockConditions, UnlockConditions) {
 	return NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions
 }
 
+var (
+	NFTLockupUnlockConditions, NFTStoragePoolUnlockConditions = NFTPoolUnlockConditions()
+)
+
 // Core NFT Types
 type (
 	NftCustody struct {
 		// merkle root corresponding to hash of NFT's data
 		// used as unique identifier for NFT throughout codebase
 		// ideally set this to a more useful/constrained type in the future
-		MerkleRoot crypto.Hash
+		FileMerkleRoot crypto.Hash
 	}
 	NftOwnershipStats struct {
 		Nft   NftCustody `json:"nftroots"`
