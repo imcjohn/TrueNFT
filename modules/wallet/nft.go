@@ -208,7 +208,7 @@ func (w *Wallet) ScanAllNFTS() []types.NftOwnershipStats {
 
 	var ret []types.NftOwnershipStats
 	for key := range w.keys {
-		for _, nft := range w.cs.FindNFTsForAddressExternal(key) {
+		for _, nft := range w.cs.FindNFTsForAddress(key) {
 			var custody types.NftOwnershipStats
 			custody.Nft = nft
 			custody.Owner = key

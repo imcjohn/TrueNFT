@@ -267,7 +267,7 @@ type (
 
 		// Find all NFTs currently in custody for a specific address on
 		// the blockchain
-		FindNFTsForAddressExternal(address types.UnlockHash) []types.NftCustody
+		FindNFTsForAddress(address types.UnlockHash) []types.NftCustody
 	}
 )
 

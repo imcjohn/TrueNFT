@@ -363,7 +363,7 @@ func (cs *ConsensusSet) ViewNFTCustody(nft types.NftCustody) (ret types.SiacoinO
 
 // Somewhat slow function to return every NFT currently held in custody by an address
 // Could be sped up significantly by storing k-v pairs flipped in bolt DB as well
-func (cs *ConsensusSet) FindNFTsForAddressExternal(address types.UnlockHash) []types.NftCustody {
+func (cs *ConsensusSet) FindNFTsForAddress(address types.UnlockHash) []types.NftCustody {
 	var ret []types.NftCustody
 	cs.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(NFTCustodyPool)
@@ -382,6 +382,12 @@ func (cs *ConsensusSet) FindNFTsForAddressExternal(address types.UnlockHash) []t
 		return nil
 	})
 	return ret
+}
+
+func (cs *ConsensusSet) FindOutputsForAddress(address types.UnlockHash) (scos []types.SiacoinOutput, scoids []types.SiacoinOutputID) {
+	cs.db.View(func(tx *bolt.Tx) error {
+
+	})
 }
 
 // addSiacoinOutput adds a siacoin output to the database. An error is returned

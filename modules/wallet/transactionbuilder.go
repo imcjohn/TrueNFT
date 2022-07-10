@@ -213,7 +213,7 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) (err error) {
 	// Collect a value-sorted set of siacoin outputs.
 	var so sortedOutputs
 	err = dbForEachSiacoinOutput(tb.wallet.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		if len(tb.wallet.cs.FindNFTsForAddressExternal(sco.UnlockHash)) == 0 {
+		if len(tb.wallet.cs.FindNFTsForAddress(sco.UnlockHash)) == 0 {
 			// for now just don't touch addresses that hold NFTs in custody
 			// in the future we can change to spending non-nft outputs in the wallet
 			so.ids = append(so.ids, scoid)
