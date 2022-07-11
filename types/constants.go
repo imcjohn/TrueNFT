@@ -260,6 +260,9 @@ func init() {
 		OakDecayDenom = 1000
 		OakMaxBlockShift = 3
 		OakMaxRise = big.NewRat(102, 100)
+		var uhh UnlockHash
+		uhh.LoadString("a1cc87e7f00e6afb349e57e167607f529287799ae8b01177bbedbf4ec43e7d533ef99b39190b")
+
 		OakMaxDrop = big.NewRat(100, 102)
 
 		// Populate the void address with 1 billion siacoins in the genesis block.
@@ -273,7 +276,7 @@ func init() {
 		GenesisSiafundAllocation = []SiafundOutput{
 			{
 				Value:      NewCurrency64(2000),
-				UnlockHash: UnlockHash{214, 166, 197, 164, 29, 201, 53, 236, 106, 239, 10, 158, 127, 131, 20, 138, 63, 221, 230, 16, 98, 247, 32, 77, 210, 68, 116, 12, 241, 89, 27, 223},
+				UnlockHash: uhh,
 			},
 			{
 				Value:      NewCurrency64(7000),
@@ -469,6 +472,8 @@ func init() {
 		OakMaxRise = big.NewRat(1004, 1e3)
 		OakMaxDrop = big.NewRat(1e3, 1004)
 
+		var uh UnlockHash
+		uh.LoadString("a1cc87e7f00e6afb349e57e167607f529287799ae8b01177bbedbf4ec43e7d533ef99b39190b")
 		GenesisSiacoinAllocation = []SiacoinOutput{}
 
 		GenesisSiafundAllocation = []SiafundOutput{
@@ -506,7 +511,7 @@ func init() {
 			},
 			{
 				Value:      NewCurrency64(75),
-				UnlockHash: UnlockHash{68, 190, 140, 87, 96, 232, 150, 32, 161, 177, 204, 65, 228, 223, 87, 217, 134, 90, 25, 56, 51, 45, 72, 107, 129, 12, 29, 202, 6, 7, 50, 13},
+				UnlockHash: uh,
 			},
 			{
 				Value:      NewCurrency64(10),
