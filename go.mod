@@ -31,4 +31,6 @@ require (
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/net v0.0.0-20210410081132-afb366fc7cd1
 	golang.org/x/term v0.0.0-20210421210424-b80969c67360
+	lukechampine.com/frand v1.4.2
+	lukechampine.com/us v0.19.4
 )
