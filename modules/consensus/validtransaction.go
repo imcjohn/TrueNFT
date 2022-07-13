@@ -29,7 +29,21 @@ var (
 	errIncorrectMintFees          = errors.New("minting fees for NFT were paid incorrectly")
 	errIncorrectTransferFees      = errors.New("transfer fees for NFT were paid incorrectly")
 	errIncorrectNFTCustody        = errors.New("NFT was spent without proper custody")
+	errOversizedLiquidation       = errors.New("NFT attempts to take more than allowed from liquidation pool")
 )
+
+// Make sure NFT has correct parent input
+func nftValidParent(tx *bolt.Tx, t types.Transaction) bool {
+	nft, _ := types.ExtractNFTFromTransaction(t)
+	out, _ := viewNFTCustodyInternal(tx, nft)
+	var parentFound bool = false
+	for _, inp := range t.SiacoinInputs {
+		if inp.UnlockConditions.UnlockHash() == out.UnlockHash {
+			parentFound = true
+		}
+	}
+	return parentFound
+}
 
 // validNFTCustody checks that for any nft operations (mint, transfer, liquidate)
 // the chain of custody is correct and all appropriate fees are apid
@@ -67,15 +81,16 @@ func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
 			return errIncorrectTransferFees
 		}
 		// then check chain-of-custody (one input should correspond to address that previously owned NFT)
-		nft, _ := types.ExtractNFTFromTransaction(t)
-		out, _ := viewNFTCustodyInternal(tx, nft)
-		var parentFound bool = false
-		for _, inp := range t.SiacoinInputs {
-			if inp.UnlockConditions.UnlockHash() == out.UnlockHash {
-				parentFound = true
-			}
+		if !nftValidParent(tx, t) {
+			return errIncorrectNFTCustody
 		}
-		if !parentFound {
+	}
+
+	if types.IsNFTLiquidationTransaction(t) {
+		// check chain-of-custody (one input should correspond to address that previously owned NFT)
+		// making sure it only mints the appropriate amount of currency is handled in the validSiacoins
+		// function below
+		if !nftValidParent(tx, t) {
 			return errIncorrectNFTCustody
 		}
 	}
