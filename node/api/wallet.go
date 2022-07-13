@@ -204,6 +204,9 @@ func RegisterRoutesWallet(router *httprouter.Router, wallet modules.Wallet, requ
 	router.POST("/wallet/nft/transfer", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		walletTransferNFTHandler(wallet, w, req, ps)
 	}, requiredPassword))
+	router.POST("/wallet/nft/liquidate", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		walletLiquidateNFTHandler(wallet, w, req, ps)
+	}, requiredPassword))
 	router.POST("/wallet/siacoins", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		walletSiacoinsHandler(wallet, w, req, ps)
 	}, requiredPassword))
@@ -636,7 +639,7 @@ func walletTransferNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req 
 	var nft types.NftCustody
 	err := merkleRoot.LoadString(req.FormValue("merkleRoot"))
 	if err != nil {
-		WriteError(w, Error{"could not load merkle root of NFT to mint"}, http.StatusInternalServerError)
+		WriteError(w, Error{"could not load merkle root of NFT to transfer"}, http.StatusInternalServerError)
 		return
 	}
 	dest, err := scanAddress(req.FormValue("destination"))
@@ -650,6 +653,42 @@ func walletTransferNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req 
 	txns, err = wallet.TransferNFT(nft, dest)
 	if err != nil {
 		WriteError(w, Error{"error when calling /wallet/nft/transfer: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
+
+	var txids []types.TransactionID
+	for _, txn := range txns {
+		txids = append(txids, txn.ID())
+	}
+	WriteJSON(w, WalletSiacoinsPOST{
+		Transactions:   txns,
+		TransactionIDs: txids,
+	})
+}
+
+// walletMintNFTHandler handles API calls to /wallet/nft/liquidate
+// arguments are merkleRoot for merkle root of the data
+// and address to send NFT lockup value to
+func walletLiquidateNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// load params
+	var merkleRoot crypto.Hash
+	var nft types.NftCustody
+	err := merkleRoot.LoadString(req.FormValue("merkleRoot"))
+	if err != nil {
+		WriteError(w, Error{"could not load merkle root of NFT to transfer"}, http.StatusInternalServerError)
+		return
+	}
+	dest, err := scanAddress(req.FormValue("destination"))
+	if err != nil {
+		WriteError(w, Error{"could not read address from POST call to /wallet/nft/liquidate"}, http.StatusBadRequest)
+		return
+	}
+	nft.FileMerkleRoot = merkleRoot
+	// make minting transaction(s)
+	var txns []types.Transaction
+	txns, err = wallet.LiquidateNFT(nft, dest)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/nft/liquidate: " + err.Error()}, http.StatusInternalServerError)
 		return
 	}
 

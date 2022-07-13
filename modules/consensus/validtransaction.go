@@ -66,7 +66,6 @@ func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
 			return errIncorrectTransferFees
 		}
 		// then check chain-of-custody (one input should correspond to address that previously owned NFT)
-
 	}
 
 	return nil
@@ -97,6 +96,16 @@ func validSiacoins(tx *bolt.Tx, t types.Transaction) error {
 		inputSum = inputSum.Add(sco.Value)
 	}
 	if !inputSum.Equals(t.SiacoinOutputSum()) {
+		// the one case where this is acceptable
+		// is a liquidation, which should mint
+		// coins to account for those that were initially burned
+		if types.IsNFTLiquidationTransaction(t) {
+			delta := t.SiacoinOutputSum().Sub(inputSum)
+			if delta.Equals(types.NFTLockupAmount) {
+				return nil
+			}
+		}
+
 		return errSiacoinInputOutputMismatch
 	}
 	return nil

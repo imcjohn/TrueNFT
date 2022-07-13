@@ -214,7 +214,7 @@ func applySiafundOutputs(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 // is the only recognized value.
 func applyArbitraryData(tx *bolt.Tx, pb *processedBlock, t types.Transaction) {
 	// NFT-specific arbitrary data
-	if types.IsNFTMintTransaction(t) || types.IsNFTTransferTransaction(t) {
+	if types.IsNFTMintTransaction(t) || types.IsNFTTransferTransaction(t) || types.IsNFTLiquidationTransaction(t) {
 		nft, owner := types.ExtractNFTFromTransaction(t)
 		updateNFTCustody(tx, nft, owner)
 	}

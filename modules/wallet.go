@@ -515,6 +515,9 @@ type (
 		// Transfer an NFT corresponding to specific data to an address
 		TransferNFT(nft types.NftCustody, dest types.UnlockHash) ([]types.Transaction, error)
 
+		// Liquidate an NFT to extract the lockup value
+		LiquidateNFT(nft types.NftCustody, dest types.UnlockHash) ([]types.Transaction, error)
+
 		// List all NFTs in the custody of this wallet
 		ScanAllNFTS() []types.NftOwnershipStats
 

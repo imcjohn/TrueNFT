@@ -199,6 +199,85 @@ func (w *Wallet) TransferNFT(nft types.NftCustody, dest types.UnlockHash) (txns 
 	return signAndSend(w, &txnBuilder)
 }
 
+// Liquidate an NFT, transferring the total value of
+// the lockup amount into the specified destination
+func (w *Wallet) LiquidateNFT(nft types.NftCustody, dest types.UnlockHash) (txns []types.Transaction, err error) {
+	// Add to threadgroup, check locks
+	_, err = preNFTWalletSetup(w)
+	if err != nil {
+		return nil, err // setup failed, pass the error on
+	}
+
+	// Create outputs for transfer fees into host pool, and colored-coin custody
+	NFTLiquidationOutput := types.SiacoinOutput{
+		UnlockHash: dest,
+		Value:      types.NFTLockupAmount, // Liquidation money minted here to match initial burn
+	}
+
+	// Assemble transaction and fund
+	_, fee := w.tpool.FeeEstimation()
+	fee = fee.Mul64(estimatedNFTTransactionSize)
+	totalCost := fee
+	txnBuilder, err := w.StartTransaction()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			txnBuilder.Drop()
+		}
+	}()
+	err = txnBuilder.FundSiacoins(totalCost)
+	if err != nil {
+		w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
+		return nil, build.ExtendErr("unable to fund transaction", err)
+	}
+	txnBuilder.AddMinerFee(fee.Add(types.OneBaseUnit)) // burn the 1SC nft custody token as a miner fee (gotta do smth with it)
+
+	// Locate NFT output from previous chain-of-custody
+	goalOutput, err := w.cs.ViewNFTCustody(nft)
+	if err != nil {
+		w.log.Println("Attempt to send NFT has failed - Could not locate NFT output for transfer")
+		return nil, build.ExtendErr("unable to locate NFT output for transfer", err)
+	}
+	var goal_scoid types.SiacoinOutputID
+	var goal_sco types.SiacoinOutput
+	var found bool = false
+	err = dbForEachSiacoinOutput(w.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
+		if sco.Value.Equals(goalOutput.Value) && sco.UnlockHash == goalOutput.UnlockHash {
+			// Not guaranteed to be the same output that was used to transfer the NFT to this address
+			// but as far as I know that shouldn't cause any problems? Haven't yet found a use-case
+			// where it needs to be the same one. If it does we can start recording output ids in applytransaction
+			goal_scoid = scoid
+			goal_sco = sco
+			found = true
+		}
+	})
+	if err != nil || !found {
+		w.log.Println("Attempt to locate NFT chain-of-custody has failed, perhaps sending an NFT that is not ours?")
+		return nil, build.ExtendErr("unable to locate NFT within our wallet", err)
+	}
+
+	// Transform into input
+	sci := types.SiacoinInput{
+		ParentID:         goal_scoid,
+		UnlockConditions: w.keys[goal_sco.UnlockHash].UnlockConditions,
+	}
+	txnBuilder.AddAndSignSiacoinInput(sci)
+
+	// Add Arbitrary Data specifier to prove NFT Minting Transaction for validators
+	arbitraryData := types.PrefixNFTCustody[:]
+	merkleRoot := []byte(nft.FileMerkleRoot.String())
+	arbitraryData = append(arbitraryData, types.NFTLiquidationTag...)
+	arbitraryData = append(arbitraryData, merkleRoot...)
+	txnBuilder.AddArbitraryData(arbitraryData)
+
+	// Include outputs in transaction and send
+	txnBuilder.AddSiacoinOutput(NFTLiquidationOutput)
+	w.log.Println("Submitting an NFT Liquidation transaction for nft", nft.FileMerkleRoot, "with fees", fee.HumanString(), "IDs:")
+	return signAndSend(w, &txnBuilder)
+}
+
 // Return all NFTs owned by this wallet as ownership stats
 func (w *Wallet) ScanAllNFTS() []types.NftOwnershipStats {
 	if err := w.tg.Add(); err != nil {

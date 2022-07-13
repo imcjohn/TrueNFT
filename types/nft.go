@@ -26,6 +26,8 @@ var (
 	NFTMintTagLength        = len(NFTMintTag) + NFTMerkleRootLength
 	NFTTransferTag          = []byte{'T', 'R'}
 	NFTTransferTagLength    = len(NFTTransferTag) + NFTMerkleRootLength
+	NFTLiquidationTag       = []byte{'L', 'Q'}
+	NFTLiquidationTagLength = len(NFTLiquidationTag) + NFTMerkleRootLength
 	NFTWithoutCustody       = SiacoinOutput{}
 	LiquidatedNFTUnlockHash = UnlockHash{'L', 'Q'}
 	// Network-specific costs
@@ -71,6 +73,16 @@ func IsNFTTransferTransaction(t Transaction) bool {
 	return b1 == NFTTransferTag[0] && b2 == NFTTransferTag[1]
 }
 
+func IsNFTLiquidationTransaction(t Transaction) bool {
+	if !IsNFTTransaction(t) || len(t.ArbitraryData[0]) < NFTLiquidationTagLength {
+		return false
+	}
+	idx := SpecifierLen
+	b1 := t.ArbitraryData[0][idx]
+	b2 := t.ArbitraryData[0][idx+1]
+	return b1 == NFTLiquidationTag[0] && b2 == NFTLiquidationTag[1]
+}
+
 // Remove NFT Information from arbitrary data section of transaction
 // Precondition on t: must be valid NFT chain-of-custody transaction
 // as determined by above funcs
@@ -80,14 +92,19 @@ func ExtractNFTFromTransaction(t Transaction) (ret NftCustody, owner SiacoinOutp
 	var merkleRoot []byte = t.ArbitraryData[0][startIndex:]
 	ret.FileMerkleRoot.LoadString(string(merkleRoot))
 	// Then extract current owner
-	// TODO: Modify to return dead value for liquidates
-	for _, out := range t.SiacoinOutputs {
-		h := out.UnlockHash
-		if h != NFTLockupUnlockConditions.UnlockHash() && h != NFTStoragePoolUnlockConditions.UnlockHash() {
-			owner = out // Valid NFT Transactions only have one non-payoff output
-			break
+	if IsNFTLiquidationTransaction(t) {
+		owner.UnlockHash = LiquidatedNFTUnlockHash
+		owner.Value = OneBaseUnit // make it valid for any checkers
+	} else {
+		for _, out := range t.SiacoinOutputs {
+			h := out.UnlockHash
+			if h != NFTLockupUnlockConditions.UnlockHash() && h != NFTStoragePoolUnlockConditions.UnlockHash() {
+				owner = out // Valid NFT Transactions only have one non-payoff output
+				break
+			}
 		}
 	}
+
 	return ret, owner
 }
 
