@@ -28,6 +28,7 @@ var (
 	errUnsignedFoundationUpdate   = errors.New("transaction contains an Foundation UnlockHash update with missing or invalid signatures")
 	errIncorrectMintFees          = errors.New("minting fees for NFT were paid incorrectly")
 	errIncorrectTransferFees      = errors.New("transfer fees for NFT were paid incorrectly")
+	errIncorrectNFTCustody        = errors.New("NFT was spent without proper custody")
 )
 
 // validNFTCustody checks that for any nft operations (mint, transfer, liquidate)
@@ -66,6 +67,17 @@ func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
 			return errIncorrectTransferFees
 		}
 		// then check chain-of-custody (one input should correspond to address that previously owned NFT)
+		nft, _ := types.ExtractNFTFromTransaction(t)
+		out, _ := viewNFTCustodyInternal(tx, nft)
+		var parentFound bool = false
+		for _, inp := range t.SiacoinInputs {
+			if inp.UnlockConditions.UnlockHash() == out.UnlockHash {
+				parentFound = true
+			}
+		}
+		if !parentFound {
+			return errIncorrectNFTCustody
+		}
 	}
 
 	return nil
