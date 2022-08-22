@@ -1,6 +1,6 @@
 Overview
 --------
-The goal of the TrueNFT proof-of-concept is to demonstrate an on-chain implementation of two features missing from current NFT blockchains, layer 1 custody, and permanant storage. These are provided as modifications on top of the Sia blockchain, and implemented to some level of completeness and reasonable accuracy to the original specifications. For more details, TrueNFT_Spec.pdf in this branch is a useful place to get started. 
+The goal of the TrueNFT proof-of-concept is to demonstrate an on-chain implementation of two features missing from current NFT blockchains, layer 1 custody, and permanant storage. These are provided as modifications on top of the Sia blockchain, and implemented to some level of completeness and reasonable accuracy to the original specifications. For more details, the [TrueNFT Implementation Spec](https://github.com/imcjohn/TrueNFT/blob/nft_custody/TrueNFT_Spec.pdf) in this branch is a useful place to get started. 
 
 Repository Structure
 --------------------
