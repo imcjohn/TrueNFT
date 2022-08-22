@@ -2,12 +2,14 @@ package wallet
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 
 	"gitlab.com/NebulousLabs/bolt"
 	"gitlab.com/NebulousLabs/errors"
 
 	"gitlab.com/NebulousLabs/encoding"
+	"go.sia.tech/siad/build"
 	"go.sia.tech/siad/crypto"
 	"go.sia.tech/siad/modules"
 	"go.sia.tech/siad/types"
@@ -211,8 +213,14 @@ func (tb *transactionBuilder) FundSiacoins(amount types.Currency) (err error) {
 	// Collect a value-sorted set of siacoin outputs.
 	var so sortedOutputs
 	err = dbForEachSiacoinOutput(tb.wallet.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
-		so.ids = append(so.ids, scoid)
-		so.outputs = append(so.outputs, sco)
+		if len(tb.wallet.cs.FindNFTsForAddress(sco.UnlockHash)) == 0 {
+			// for now just don't touch addresses that hold NFTs in custody
+			// in the future we can change to spending non-nft outputs in the wallet
+			so.ids = append(so.ids, scoid)
+			so.outputs = append(so.outputs, sco)
+		} else if build.DEBUG {
+			fmt.Println("Skipping output", sco, "for auto-funding because it may belong to an NFT")
+		}
 	})
 	if err != nil {
 		return err
@@ -551,6 +559,16 @@ func (tb *transactionBuilder) AddMinerFee(fee types.Currency) uint64 {
 func (tb *transactionBuilder) AddSiacoinInput(input types.SiacoinInput) uint64 {
 	tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, input)
 	return uint64(len(tb.transaction.SiacoinInputs) - 1)
+}
+
+// AddSiacoinInput adds a siacoin input to the transaction, returning the index
+// of the siacoin input within the transaction. When 'Sign' gets called, this
+// input will be signed
+func (tb *transactionBuilder) AddAndSignSiacoinInput(input types.SiacoinInput) uint64 {
+	tb.transaction.SiacoinInputs = append(tb.transaction.SiacoinInputs, input)
+	index := int(len(tb.transaction.SiacoinInputs) - 1)
+	tb.siacoinInputs = append(tb.siacoinInputs, index)
+	return uint64(index)
 }
 
 // AddSiacoinOutput adds a siacoin output to the transaction, returning the

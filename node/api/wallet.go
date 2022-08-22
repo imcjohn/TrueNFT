@@ -195,6 +195,18 @@ func RegisterRoutesWallet(router *httprouter.Router, wallet modules.Wallet, requ
 	router.GET("/wallet/seeds", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		walletSeedsHandler(wallet, w, req, ps)
 	}, requiredPassword))
+	router.POST("/wallet/nft/mint", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		walletMintNFTHandler(wallet, w, req, ps)
+	}, requiredPassword))
+	router.GET("/wallet/nft/scan", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		walletScanNFTHandler(wallet, w, req, ps)
+	}, requiredPassword)) // not sure if this should require password
+	router.POST("/wallet/nft/transfer", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		walletTransferNFTHandler(wallet, w, req, ps)
+	}, requiredPassword))
+	router.POST("/wallet/nft/liquidate", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		walletLiquidateNFTHandler(wallet, w, req, ps)
+	}, requiredPassword))
 	router.POST("/wallet/siacoins", RequirePassword(func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		walletSiacoinsHandler(wallet, w, req, ps)
 	}, requiredPassword))
@@ -576,6 +588,117 @@ func walletSeedsHandler(wallet modules.Wallet, w http.ResponseWriter, req *http.
 		PrimarySeed:        primarySeedStr,
 		AddressesRemaining: int(addrsRemaining),
 		AllSeeds:           allSeedsStrs,
+	})
+}
+
+// walletMintNFTHandler handles API calls to /wallet/nft/mint
+// only argument is merkleRoot for merkle root of the data
+func walletMintNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// load params
+	var merkleRoot crypto.Hash
+	var nft types.NftCustody
+	err := merkleRoot.LoadString(req.FormValue("merkleRoot"))
+	if err != nil {
+		WriteError(w, Error{"could not load merkle root of NFT to mint"}, http.StatusInternalServerError)
+		return
+	}
+	nft.FileMerkleRoot = merkleRoot
+	// make minting transaction(s)
+	unlockConditions, _ := wallet.NextAddress()
+	var txns []types.Transaction
+	var output types.UnlockHash = unlockConditions.UnlockHash()
+	txns, err = wallet.MintNFT(nft, output)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/nft/mint: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
+
+	var txids []types.TransactionID
+	for _, txn := range txns {
+		txids = append(txids, txn.ID())
+	}
+	WriteJSON(w, WalletSiacoinsPOST{
+		Transactions:   txns,
+		TransactionIDs: txids,
+	})
+}
+
+// Return json representation of all NFTs in the custody of this wallet
+// Api hook of /wallet/nft/scan
+func walletScanNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var custody []types.NftOwnershipStats = wallet.ScanAllNFTS()
+	WriteJSON(w, custody)
+}
+
+// walletMintNFTHandler handles API calls to /wallet/nft/transfer
+// arguments are merkleRoot for merkle root of the data
+// and address to transfer the NFT to
+func walletTransferNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// load params
+	var merkleRoot crypto.Hash
+	var nft types.NftCustody
+	err := merkleRoot.LoadString(req.FormValue("merkleRoot"))
+	if err != nil {
+		WriteError(w, Error{"could not load merkle root of NFT to transfer"}, http.StatusInternalServerError)
+		return
+	}
+	dest, err := scanAddress(req.FormValue("destination"))
+	if err != nil {
+		WriteError(w, Error{"could not read address from POST call to /wallet/nft/transfer"}, http.StatusBadRequest)
+		return
+	}
+	nft.FileMerkleRoot = merkleRoot
+	// make minting transaction(s)
+	var txns []types.Transaction
+	txns, err = wallet.TransferNFT(nft, dest)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/nft/transfer: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
+
+	var txids []types.TransactionID
+	for _, txn := range txns {
+		txids = append(txids, txn.ID())
+	}
+	WriteJSON(w, WalletSiacoinsPOST{
+		Transactions:   txns,
+		TransactionIDs: txids,
+	})
+}
+
+// walletMintNFTHandler handles API calls to /wallet/nft/liquidate
+// arguments are merkleRoot for merkle root of the data
+// and address to send NFT lockup value to
+func walletLiquidateNFTHandler(wallet modules.Wallet, w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// load params
+	var merkleRoot crypto.Hash
+	var nft types.NftCustody
+	err := merkleRoot.LoadString(req.FormValue("merkleRoot"))
+	if err != nil {
+		WriteError(w, Error{"could not load merkle root of NFT to transfer"}, http.StatusInternalServerError)
+		return
+	}
+	dest, err := scanAddress(req.FormValue("destination"))
+	if err != nil {
+		WriteError(w, Error{"could not read address from POST call to /wallet/nft/liquidate"}, http.StatusBadRequest)
+		return
+	}
+	nft.FileMerkleRoot = merkleRoot
+	// make minting transaction(s)
+	var txns []types.Transaction
+	txns, err = wallet.LiquidateNFT(nft, dest)
+	if err != nil {
+		WriteError(w, Error{"error when calling /wallet/nft/liquidate: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
+
+	var txids []types.TransactionID
+	for _, txn := range txns {
+		txids = append(txids, txn.ID())
+	}
+	WriteJSON(w, WalletSiacoinsPOST{
+		Transactions:   txns,
+		TransactionIDs: txids,
 	})
 }
 

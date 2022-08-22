@@ -107,7 +107,8 @@ func isStandardTransaction(t types.Transaction) (uint64, error) {
 		if prefix == modules.PrefixHostAnnouncement ||
 			prefix == modules.PrefixNonSia ||
 			prefix == modules.PrefixFileContractIdentifier ||
-			prefix == types.SpecifierFoundation {
+			prefix == types.SpecifierFoundation ||
+			prefix == types.PrefixNFTCustody {
 			continue
 		}
 

@@ -260,6 +260,14 @@ type (
 		// allowing for garbage collection and rescanning. If the subscriber is
 		// not found in the subscriber database, no action is taken.
 		Unsubscribe(ConsensusSetSubscriber)
+
+		// View custody of an NFT on (our view of) current network consensus
+		// Abstraction for custody representation
+		ViewNFTCustody(nft types.NftCustody) (types.SiacoinOutput, error)
+
+		// Find all NFTs currently in custody for a specific address on
+		// the blockchain
+		FindNFTsForAddress(address types.UnlockHash) []types.NftCustody
 	}
 )
 
