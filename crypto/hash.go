@@ -115,3 +115,15 @@ func (h *Hash) UnmarshalJSON(b []byte) error {
 	copy(h[:], hBytes)
 	return nil
 }
+
+// UnmarshalJSON decodes the json hex string of the hash.
+func (h *Hash) LoadFromBytes(b []byte) error {
+	// *2 because there are 2 hex characters per byte.
+	// +2 because the encoded JSON string has a `"` added at the beginning and end.
+	if len(b) != len(h) {
+		return ErrHashWrongLen
+	}
+
+	copy(h[:], b)
+	return nil
+}

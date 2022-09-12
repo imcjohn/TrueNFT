@@ -26,7 +26,77 @@ var (
 	errUnrecognizedFileContractID = errors.New("cannot fetch storage proof segment for unknown file contract")
 	errWrongUnlockConditions      = errors.New("transaction contains incorrect unlock conditions")
 	errUnsignedFoundationUpdate   = errors.New("transaction contains an Foundation UnlockHash update with missing or invalid signatures")
+	errIncorrectMintFees          = errors.New("minting fees for NFT were paid incorrectly")
+	errIncorrectTransferFees      = errors.New("transfer fees for NFT were paid incorrectly")
+	errIncorrectNFTCustody        = errors.New("NFT was spent without proper custody")
+	errOversizedLiquidation       = errors.New("NFT attempts to take more than allowed from liquidation pool")
 )
+
+// Make sure NFT has correct parent input
+func nftValidParent(tx *bolt.Tx, t types.Transaction) bool {
+	nft, _ := types.ExtractNFTFromTransaction(t)
+	out, _ := viewNFTCustodyInternal(tx, nft)
+	var parentFound bool = false
+	for _, inp := range t.SiacoinInputs {
+		if inp.UnlockConditions.UnlockHash() == out.UnlockHash {
+			parentFound = true
+		}
+	}
+	return parentFound
+}
+
+// validNFTCustody checks that for any nft operations (mint, transfer, liquidate)
+// the chain of custody is correct and all appropriate fees are apid
+func validNFTCustody(tx *bolt.Tx, t types.Transaction) error {
+	// For any mint transaction, check that fees are being paid to appropriate pools
+	if types.IsNFTMintTransaction(t) {
+		var lockupPaid = false
+		var storagePaid = false
+		var validOutputCount = (len(t.SiacoinOutputs) == 3) // lockup + storage + colored coin
+		for _, op := range t.SiacoinOutputs {
+			if op.UnlockHash == types.NFTLockupUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTLockupAmount) {
+				lockupPaid = true
+			}
+			if op.UnlockHash == types.NFTStoragePoolUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTHostAmount) {
+				storagePaid = true
+			}
+		}
+		if !lockupPaid || !storagePaid || !validOutputCount {
+			return errIncorrectMintFees
+		}
+	}
+
+	if types.IsNFTTransferTransaction(t) {
+		// first validate payment to pool (as with mint)
+		var storagePaid = false
+		var validOutputCount = (len(t.SiacoinOutputs) == 2) // storage + colored coin
+		for _, op := range t.SiacoinOutputs {
+			if op.UnlockHash == types.NFTStoragePoolUnlockConditions.UnlockHash() && op.Value.Equals(types.NFTTransferCost) {
+				// fmt.Println("output", op.UnlockHash, op.Value)
+				storagePaid = true
+			}
+		}
+		if !storagePaid || !validOutputCount {
+			// fmt.Println(storagePaid, validOutputCount, len(t.SiacoinOutputs))
+			return errIncorrectTransferFees
+		}
+		// then check chain-of-custody (one input should correspond to address that previously owned NFT)
+		if !nftValidParent(tx, t) {
+			return errIncorrectNFTCustody
+		}
+	}
+
+	if types.IsNFTLiquidationTransaction(t) {
+		// check chain-of-custody (one input should correspond to address that previously owned NFT)
+		// making sure it only mints the appropriate amount of currency is handled in the validSiacoins
+		// function below
+		if !nftValidParent(tx, t) {
+			return errIncorrectNFTCustody
+		}
+	}
+
+	return nil
+}
 
 // validSiacoins checks that the siacoin inputs and outputs are valid in the
 // context of the current consensus set.
@@ -53,6 +123,16 @@ func validSiacoins(tx *bolt.Tx, t types.Transaction) error {
 		inputSum = inputSum.Add(sco.Value)
 	}
 	if !inputSum.Equals(t.SiacoinOutputSum()) {
+		// the one case where this is acceptable
+		// is a liquidation, which should mint
+		// coins to account for those that were initially burned
+		if types.IsNFTLiquidationTransaction(t) {
+			delta := t.SiacoinOutputSum().Sub(inputSum)
+			if delta.Equals(types.NFTLockupAmount) {
+				return nil
+			}
+		}
+
 		return errSiacoinInputOutputMismatch
 	}
 	return nil
@@ -352,6 +432,10 @@ func validTransaction(tx *bolt.Tx, t types.Transaction) error {
 		return err
 	}
 	err = validArbitraryData(tx, t, currentHeight)
+	if err != nil {
+		return err
+	}
+	err = validNFTCustody(tx, t)
 	if err != nil {
 		return err
 	}

@@ -171,6 +171,11 @@ type (
 		// gets called, this input will be left unsigned.
 		AddSiacoinInput(types.SiacoinInput) uint64
 
+		// AddSiacoinInput adds a siacoin input to the transaction, returning
+		// the index of the siacoin input within the transaction. When 'Sign'
+		// gets called, this input will be signed.
+		AddAndSignSiacoinInput(types.SiacoinInput) uint64
+
 		// AddSiacoinOutput adds a siacoin output to the transaction, returning
 		// the index of the siacoin output within the transaction.
 		AddSiacoinOutput(types.SiacoinOutput) uint64
@@ -503,6 +508,18 @@ type (
 		// transactions are automatically given to the transaction pool, and are
 		// also returned to the caller.
 		SendSiacoins(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)
+
+		// Mint an NFT corresponding to specific data to an address
+		MintNFT(nft types.NftCustody, dest types.UnlockHash) ([]types.Transaction, error)
+
+		// Transfer an NFT corresponding to specific data to an address
+		TransferNFT(nft types.NftCustody, dest types.UnlockHash) ([]types.Transaction, error)
+
+		// Liquidate an NFT to extract the lockup value
+		LiquidateNFT(nft types.NftCustody, dest types.UnlockHash) ([]types.Transaction, error)
+
+		// List all NFTs in the custody of this wallet
+		ScanAllNFTS() []types.NftOwnershipStats
 
 		// SendSiacoinsFeeIncluded sends siacoins with fees included.
 		SendSiacoinsFeeIncluded(amount types.Currency, dest types.UnlockHash) ([]types.Transaction, error)

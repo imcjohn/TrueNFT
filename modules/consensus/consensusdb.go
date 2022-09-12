@@ -7,6 +7,8 @@ package consensus
 // ignored otherwise, which is suboptimal.
 
 import (
+	"fmt"
+
 	"gitlab.com/NebulousLabs/bolt"
 
 	"gitlab.com/NebulousLabs/encoding"
@@ -70,6 +72,12 @@ var (
 	// siafund pool.
 	SiafundPool = []byte("SiafundPool")
 
+	// NFTCustodyPool
+	// The NFT Custody Pool maps the merkle root of every seen NFT to the current
+	// custodial output of that NFT, nil if unseen,
+	// and a special key value for liquidated
+	NFTCustodyPool = []byte("NFTCustodyPool")
+
 	// FoundationUnlockHashes is a database bucket storing primary and failsafe
 	// Foundation UnlockHashes. It stores both the current values (keyed by
 	// "FoundationUnlockHashes") and the values at specific blocks (keyed by
@@ -101,6 +109,7 @@ func (cs *ConsensusSet) createConsensusDB(tx *bolt.Tx) error {
 		FileContracts,
 		SiafundOutputs,
 		SiafundPool,
+		NFTCustodyPool,
 	}
 	for _, bucket := range buckets {
 		_, err := tx.CreateBucket(bucket)
@@ -301,6 +310,78 @@ func getSiacoinOutput(tx *bolt.Tx, id types.SiacoinOutputID) (types.SiacoinOutpu
 		return types.SiacoinOutput{}, err
 	}
 	return sco, nil
+}
+
+// Updates NFT Custody to unlock hash currently belonging to unspent NFT output
+// or to types.LiquidatedNFTUnlockHash for a liquidated NFT
+func updateNFTCustody(tx *bolt.Tx, nft types.NftCustody, owner types.SiacoinOutput) {
+	nftOutputs := tx.Bucket(NFTCustodyPool)
+	var id []byte = nft.FileMerkleRoot[:]
+	var custody []byte = encoding.Marshal(owner)
+
+	if build.DEBUG {
+		fmt.Println("NFT Custody updated for", nft, "new owner:", owner, "bytes:", custody)
+	}
+
+	err := nftOutputs.Put(id, custody)
+
+	if err != nil && build.DEBUG {
+		s := fmt.Sprintf("Error updating custody %s", err)
+		panic(s)
+	}
+}
+
+// For a given NFT Custody marker, return the unspent output
+// currently containing ownership of this NFT
+// or empty unlock hash for liquidated/unminted NFTs
+func viewNFTCustodyInternal(tx *bolt.Tx, nft types.NftCustody) (types.SiacoinOutput, error) {
+	nftOutputs := tx.Bucket(NFTCustodyPool)
+	var id []byte = nft.FileMerkleRoot[:]
+
+	var data []byte = nftOutputs.Get(id)
+	if data == nil {
+		if build.DEBUG {
+			fmt.Println("NOTE: NFT DB miss for", nft)
+		}
+		return types.NFTWithoutCustody, errNilItem // not found, return blank hash
+	}
+	var ret types.SiacoinOutput
+	encoding.Unmarshal(data, &ret)
+	if build.DEBUG {
+		fmt.Println("Located nft custody for", nft, "owner:", ret, "owner bytes:", data)
+	}
+	return ret, nil
+}
+
+func (cs *ConsensusSet) ViewNFTCustody(nft types.NftCustody) (ret types.SiacoinOutput, err error) {
+	cs.db.View(func(tx *bolt.Tx) error {
+		ret, err = viewNFTCustodyInternal(tx, nft)
+		return nil
+	})
+	return
+}
+
+// Somewhat slow function to return every NFT currently held in custody by an address
+// Could be sped up significantly by storing k-v pairs flipped in bolt DB as well
+func (cs *ConsensusSet) FindNFTsForAddress(address types.UnlockHash) []types.NftCustody {
+	var ret []types.NftCustody
+	cs.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(NFTCustodyPool)
+
+		_ = b.ForEach(func(k []byte, data []byte) error {
+			var sco types.SiacoinOutput
+			encoding.Unmarshal(data, &sco)
+			if sco.UnlockHash == address {
+				var found types.NftCustody
+				fmt.Println("found custody", k, string(k))
+				found.FileMerkleRoot.LoadFromBytes(k)
+				ret = append(ret, found)
+			}
+			return nil
+		})
+		return nil
+	})
+	return ret
 }
 
 // addSiacoinOutput adds a siacoin output to the database. An error is returned
